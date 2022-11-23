@@ -1,0 +1,9 @@
+### Example user template template
+### Example user template
+.idea
+.venv
+*.iml
+*.lock
+*.toml
+out
+gen
