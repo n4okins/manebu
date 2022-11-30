@@ -2,8 +2,11 @@
 ### Example user template
 .idea
 .venv
+.ipynb_checkpoints
+*logs
+
 *.iml
 *.lock
-*.toml
 out
 gen
+ignore_dir

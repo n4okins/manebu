@@ -39,7 +39,7 @@ def conway_mlp(x):
 def conway_graph(size) -> jraph.GraphsTuple:
     """Returns a graph representing the game field of conway's game of life."""
     # Creates nodes: each node represents a cell in the game.
-    n_node = size**2
+    n_node = size ** 2
     nodes = np.zeros((n_node, 1))
     node_indices = jnp.arange(n_node)
     # Creates edges, senders and receivers:
@@ -51,7 +51,7 @@ def conway_graph(size) -> jraph.GraphsTuple:
          node_indices - 1, node_indices + 1,
          node_indices + size - 1, node_indices + size, node_indices + size + 1])
     senders = senders.T.reshape(-1)
-    senders = (senders + size**2) % size**2
+    senders = (senders + size ** 2) % size ** 2
     receivers = jnp.repeat(node_indices, 8)
     # Adds a glider to the game
     nodes[0, 0] = 1.0
@@ -83,11 +83,10 @@ def display_graph(graph: jraph.GraphsTuple):
         ''.join(_display_node(nodes[i * size + j][0])
                 for j in range(size))
         for i in range(size))
-    print("-" * size + f"\n{output}\n"+ f"\033[{size + 1}A", end="")
+    print("-" * size + f"\n{output}\n" + f"\033[{size + 1}A", end="")
 
 
 def main(_):
-
     def net_fn(graph: jraph.GraphsTuple):
         unf = jraph.concatenated_args(conway_mlp)
         net = jraph.InteractionNetwork(
@@ -103,6 +102,7 @@ def main(_):
         time.sleep(0.05)
         cg = jax.jit(net.apply)(params, cg)
         display_graph(cg)
+
 
 if __name__ == '__main__':
     FLAGS = flags.FLAGS

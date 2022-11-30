@@ -1,5 +1,4 @@
-from manebu.phenomena.graph import Graph
-from pathlib import Path
+import jax
 
 if __name__ == "__main__":
-    pass
+    print(jax.default_backend())
