@@ -40,6 +40,7 @@ torchvision = [
 pandas = "^1.5.2"
 seaborn = "^0.12.1"
 evojax = "^0.2.15"
+mediapy = "^1.1.2"
 
 
 [[tool.poetry.source]]
