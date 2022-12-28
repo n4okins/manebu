@@ -3,6 +3,8 @@
 .idea
 .venv
 .ipynb_checkpoints
+data
+__pycache__
 *logs
 
 *.iml
