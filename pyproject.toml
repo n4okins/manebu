@@ -2,7 +2,7 @@
 name = "manebu"
 version = "0.1.0"
 description = ""
-authors = ["n4okins <naoki.jsdf.jj@gmail.com>"]
+authors = ["n4okins <n4okins.developer@gmail.com>"]
 readme = "README.md"
 packages = [
     { include = "manebu", from = "." }
