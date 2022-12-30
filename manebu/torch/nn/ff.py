@@ -1,9 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.optim as opt
+
+from torch_geometric.nn import GCNConv
+
 from torch.nn.common_types import (
     _size_2_t
 )
+
 
 from abc import abstractmethod
 from uuid import uuid4
@@ -13,7 +17,7 @@ from typing import Union
 from manebu.utils.simple_utils import return_default
 
 __all__ = [
-    "FFModule", "FFLinear", "FFConv2d"
+    "FFModule", "FFLinear", "FFConv2d", "FFGCNConv"
 ]
 
 
@@ -43,10 +47,10 @@ class FFModule(nn.Module):
         FFModule.__layer_cnt__ += 1
         FFModule.__layer_dict__[self._name] = self
 
-    def _init_ffmodule(self):
-        self._init_optimizer()
+    def init_ffmodule(self):
+        self.init_optimizer()
 
-    def _init_optimizer(self):
+    def init_optimizer(self):
         self.optimizer = self._optimizer_fn(self.parameters(), lr=self.learning_rate)
 
     @abstractmethod
@@ -62,7 +66,7 @@ class FFModule(nn.Module):
             )
         ).mean()
 
-    def layer_train(self, positive_sample, negative_sample):
+    def train(self, positive_sample, negative_sample):
         with tqdm(range(self.train_num_epochs_in_layer), leave=False) as t:
             for i in t:
                 t.set_description(
@@ -89,7 +93,7 @@ class FFLinear(FFModule, nn.Linear):
         FFModule.__init__(self, train_num_epochs_in_layer, activation_fn, optimizer_fn, layer_name, learning_rate)
         nn.Linear.__init__(self, in_features, out_features, bias, device, dtype)
 
-        self._init_ffmodule()
+        self.init_ffmodule()
 
     def forward(self, x):
         return nn.Linear.forward(self, x)
@@ -121,7 +125,31 @@ class FFConv2d(FFModule, nn.Conv2d):
         nn.Conv2d.__init__(self, in_channels, out_channels, kernel_size, stride, padding,
                            dilation, groups, bias, padding_mode, device, dtype)
 
-        self._init_ffmodule()
+        self.init_ffmodule()
 
     def forward(self, x):
         return nn.Conv2d.forward(self, x)
+
+
+class FFGCNConv(FFModule, GCNConv):
+    def __init__(
+            self,
+            train_num_epochs_in_layer: int,
+            in_channels: int, out_channels: int,
+            improved: bool = False,
+            cached: bool = False,
+            add_self_loops: bool = True,
+            normalize: bool = True,
+            bias: bool = True,
+            activation_fn=None,
+            optimizer_fn=None,
+            layer_name=None,
+            learning_rate=None,
+    ):
+        FFModule.__init__(self, train_num_epochs_in_layer, activation_fn, optimizer_fn, layer_name, learning_rate)
+        GCNConv.__init__(self, in_channels, out_channels, improved, cached, add_self_loops, normalize, bias)
+
+        self.init_ffmodule()
+
+    def forward(self, x):
+        return GCNConv.forward(self, x)

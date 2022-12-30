@@ -1,6 +1,13 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+from torch_scatter import scatter_max
+from torch_geometric.data import Data
+
+
 import manebu.torch.nn as mnn
+import manebu.torch.nn.common as mcnn
 
 from torchvision.datasets import MNIST
 from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
@@ -10,12 +17,12 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from pprint import pprint
 
+
 def MNIST_loaders(train_batch_size=50000, test_batch_size=10000):
     transform = Compose([
         ToTensor(),
-        Normalize((0.1307,), (0.3081,)),
-        Lambda(lambda x: torch.flatten(x))
-        ])
+        # Normalize((0.1307,), (0.3081,))
+    ])
 
     train_loader = DataLoader(
         MNIST('./data/', train=True,
@@ -42,31 +49,29 @@ def overlay_y_on_x(x, y):
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        self.layers = [
-            mnn.FFLinear(100, in_features=784, out_features=500),
-            mnn.FFLinear(100, in_features=500, out_features=500),
-            mnn.FFLinear(100, in_features=500, out_features=10)
-        ]
-
-        for l in self.layers:
+        self.layers = {
+            "conv1": mnn.FFGCNConv(10, 2, 16),
+            "conv2": mnn.FFGCNConv(10, 16, 32),
+            "conv3": mnn.FFGCNConv(10, 32, 64),
+            "conv4": mnn.FFGCNConv(10, 64, 128),
+            "linear1": mnn.FFLinear(10, 128, 64),
+            "linear2": mnn.FFLinear(10, 64, 10),
+        }
+        for l in self.layers.values():
             l.cuda()
 
-    def forward(self, x):
-        return self.predict(x)
+    def forward(self, data):
+        x, edge_index = data.x, data.edge_index
+        for name, layer in self.layers.items():
+            if name == "linear1":
+                x, _ = scatter_max(x, data.batch, dim=0)
+            x = layer(x)
+        return x.detach()
 
     def predict(self, x):
-        goodness_per_label = []
-        for label in range(10):
-            goodness = []
-            h = x
-            for layer in self.layers:
-                h = layer(h)
-                goodness += [h.pow(2).mean(1)]
-            goodness_per_label += [sum(goodness).unsqueeze(1)]
-        goodness_per_label = torch.cat(goodness_per_label, 1)
-        return goodness_per_label
+        return self.forward(x)
 
-    def net_train(self, x, y):
+    def train(self, x, y):
         for y_label in set(y.cpu().detach().numpy()):
             h_pos = x[torch.where(y == y_label)]
             h_neg = x[torch.where(y != y_label)]
@@ -74,69 +79,58 @@ class Net(nn.Module):
 
             for i, layer in enumerate(self.layers):
                 if isinstance(layer, mnn.FFModule):
-                    h_pos, h_neg = layer.layer_train(h_pos, h_neg)
+                    h_pos, h_neg = layer.train(h_pos, h_neg)
                 else:
                     h_pos, h_neg = layer(h_pos), layer(h_neg)
 
 
+def plot_output(output, nrows, ncols):
+    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols, nrows))
+    fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.95, wspace=0.1, hspace=0.1)
+    for i in range(nrows):
+        for j in range(ncols):
+            ax = axes[i][j]
+            ax.imshow(output[:, :, i * nrows + j], cmap="gray")
+            ax.axis("off")
+
+
 if __name__ == "__main__":
-    # torch.manual_seed(1234)
+    torch.manual_seed(1234)
     train_loader, test_loader = MNIST_loaders()
 
     x, y = next(iter(train_loader))
     x, y = x.cuda(), y.cuda()
-    # for y_label in range(10):
-    #     h_pos = x[torch.where(y == y_label)].numpy()
-    #     h_neg = x[torch.where(y != y_label)].numpy()
-    #     h_neg = h_neg[torch.randperm(len(h_neg))][:len(h_pos)]
-    #     nrows, ncols = 10, 10
-    #     fig, axes = plt.subplots(nrows, ncols, figsize=(nrows, ncols))
-    #     fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.95, wspace=0.1, hspace=0.1)
-    #     for i in range(nrows):
-    #         for j in range(ncols):
-    #             ax = axes[i][j]
-    #             ax.imshow(h_neg[i * nrows + j].transpose(1, 2, 0), cmap="gray")
-    #             ax.axis("off")
-    #     plt.suptitle(f"label={y_label}")
-    #     plt.show()
-    # exit()
 
+    print(x.min(), x.max(), x[torch.where(x != 0)].mean(), x[(torch.where(torch.logical_and(torch.as_tensor(x != 0), torch.as_tensor(x != 1))))].mean())
+
+    exit()
     net = Net()
-
     # net = mnn.FFConv2d(1000, in_channels=1, out_channels=16, kernel_size=(3, 3), padding=1).cuda()
     # net = nn.Conv2d(1, 16, (3, 3), padding=1).cuda()
+
     plt.imshow(x[0:1].detach().cpu().numpy().reshape((1, 28, 28)).transpose(1, 2, 0), cmap="gray")
     plt.show()
 
-    mx = net.predict(x[0:1]).detach().cpu().numpy()
-    pprint(list(enumerate(mx)))
+    mx = net(x[0:1]).detach().cpu().numpy().transpose((2, 3, 1, 0)).reshape(28, 28, 16)  # .reshape(8, 8, 1)
+    print(mx.shape)
+    plot_output(mx, 4, 4)
+    plt.show()
 
-    net.net_train(x, y)
+    net.train(x, y)
 
-    mx = net.predict(x[0:1]).detach().cpu().numpy()
-    pprint(list(enumerate(mx)))
-
-    # nrows, ncols = 4, 4
-    # fig, axes = plt.subplots(nrows, ncols, figsize=(nrows, ncols))
-    # fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.95, wspace=0.1, hspace=0.1)
-    # for i in range(nrows):
-    #     for j in range(ncols):
-    #         ax = axes[i][j]
-    #         ax.imshow(mx[i * nrows + j], cmap="gray")
-    #         ax.axis("off")
-    #
-    # plt.show()
+    mx = net(x[0:1]).detach().cpu().numpy().transpose((2, 3, 1, 0)).reshape(28, 28, 16)
+    plot_output(mx, 4, 4)
+    plt.show()
     exit()
 
-    x_pos = overlay_y_on_x(x, y)
-    rnd = torch.randperm(x.size(0))
-    x_neg = overlay_y_on_x(x, y[rnd])
-    net.train(x_pos, x_neg)
-
-    print('train error:', 1.0 - net.predict(x).eq(y).float().mean().item())
-
-    x_te, y_te = next(iter(test_loader))
-    x_te, y_te = x_te.cuda(), y_te.cuda()
-
-    print('test error:', 1.0 - net.predict(x_te).eq(y_te).float().mean().item())
-
+    # x_pos = overlay_y_on_x(x, y)
+    # rnd = torch.randperm(x.size(0))
+    # x_neg = overlay_y_on_x(x, y[rnd])
+    # net.train(x_pos, x_neg)
+    #
+    # print('train error:', 1.0 - net.predict(x).eq(y).float().mean().item())
+    #
+    # x_te, y_te = next(iter(test_loader))
+    # x_te, y_te = x_te.cuda(), y_te.cuda()
+    #
+    # print('test error:', 1.0 - net.predict(x_te).eq(y_te).float().mean().item())
