@@ -9,15 +9,14 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.10"
-torch = "^1.13.1"
-torchvision = "^0.14.1"
-torchaudio = "^0.13.1"
+python = "=3.10.9"
+
 matplotlib = "^3.6.2"
-jraph = "^0.0.6.dev0"
-evojax = "^0.2.15"
 jupyter = "^1.0.0"
 jupyterlab = "^3.5.2"
+pillow = "^9.3.0"
+scipy = "^1.9.3"
+tqdm = "^4.64.1"
 
 
 [build-system]

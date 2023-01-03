@@ -95,6 +95,7 @@ def plot_output(output, nrows, ncols):
 
 
 if __name__ == "__main__":
+    # print(torch.cuda.is_available())
     torch.manual_seed(1234)
     train_loader, test_loader = MNIST_loaders()
 
@@ -103,7 +104,6 @@ if __name__ == "__main__":
 
     print(x.min(), x.max(), x[torch.where(x != 0)].mean(), x[(torch.where(torch.logical_and(torch.as_tensor(x != 0), torch.as_tensor(x != 1))))].mean())
 
-    exit()
     net = Net()
     # net = mnn.FFConv2d(1000, in_channels=1, out_channels=16, kernel_size=(3, 3), padding=1).cuda()
     # net = nn.Conv2d(1, 16, (3, 3), padding=1).cuda()
@@ -123,14 +123,14 @@ if __name__ == "__main__":
     plt.show()
     exit()
 
-    # x_pos = overlay_y_on_x(x, y)
-    # rnd = torch.randperm(x.size(0))
-    # x_neg = overlay_y_on_x(x, y[rnd])
-    # net.train(x_pos, x_neg)
-    #
-    # print('train error:', 1.0 - net.predict(x).eq(y).float().mean().item())
-    #
-    # x_te, y_te = next(iter(test_loader))
-    # x_te, y_te = x_te.cuda(), y_te.cuda()
-    #
-    # print('test error:', 1.0 - net.predict(x_te).eq(y_te).float().mean().item())
+    x_pos = overlay_y_on_x(x, y)
+    rnd = torch.randperm(x.size(0))
+    x_neg = overlay_y_on_x(x, y[rnd])
+    net.train(x_pos, x_neg)
+
+    print('train error:', 1.0 - net.predict(x).eq(y).float().mean().item())
+
+    x_te, y_te = next(iter(test_loader))
+    x_te, y_te = x_te.cuda(), y_te.cuda()
+
+    print('test error:', 1.0 - net.predict(x_te).eq(y_te).float().mean().item())
